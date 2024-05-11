@@ -28,6 +28,9 @@ async function run() {
     // await client.db("admin").command({ ping: 1 });
 
     const queriesCollection = client.db("alternifyDB").collection("queries");
+    const recommendationCollection = client
+      .db("alternifyDB")
+      .collection("recommendations");
 
     app.post("/add-queries", async (req, res) => {
       const queries = req.body;
@@ -47,9 +50,23 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/add-recommendation", (req, res) => {
+    app.post("/add-recommendation", async (req, res) => {
       const recommendedData = req.body;
-      console.log(recommendedData);
+      const id = recommendedData.queryId;
+      const filter = { _id: new ObjectId(id) };
+
+      const result = recommendationCollection.insertOne(recommendedData);
+
+      const updateDoc = {
+        $inc: {
+          recommendation_count: +1,
+        },
+      };
+      const updateRecommendationCount = await queriesCollection.updateOne(
+        filter,
+        updateDoc
+      );
+      res.send(result);
     });
 
     app.get("/my-queries", async (req, res) => {
