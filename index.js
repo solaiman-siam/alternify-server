@@ -47,6 +47,11 @@ async function run() {
       res.send(result);
     });
 
+    app.post("/add-recommendation", (req, res) => {
+      const recommendedData = req.body;
+      console.log(recommendedData);
+    });
+
     app.get("/my-queries", async (req, res) => {
       const email = req.query.email;
       const query = { user_email: email };
