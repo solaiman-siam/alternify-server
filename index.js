@@ -1,5 +1,5 @@
 const express = require("express");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app = express();
@@ -34,9 +34,39 @@ async function run() {
       const result = await queriesCollection.insertOne(queries);
       res.send(result);
     });
+    app.get("/all-queries", async (req, res) => {
+      const result = await queriesCollection.find().toArray();
+      res.send(result);
+    });
 
     app.get("/my-queries", async (req, res) => {
       const result = await queriesCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.delete("/delete-queries/:id", async (req, res) => {
+      const params = req.params.id;
+      const query = { _id: new ObjectId(params) };
+      const result = queriesCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.put("/update-queries/:id", async (req, res) => {
+      const params = req.params.id;
+      const updateData = req.body;
+      const filter = { _id: new ObjectId(params) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          product_name: updateData.product_name,
+          image_url: updateData.image_url,
+          details: updateData.details,
+          query_title: updateData.query_title,
+          brand: updateData.brand,
+        },
+      };
+
+      const result = queriesCollection.updateOne(filter, updateDoc, options);
       res.send(result);
     });
 
