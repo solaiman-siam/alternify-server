@@ -39,8 +39,18 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/product-details/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const query = { _id: new ObjectId(id) };
+      const result = await queriesCollection.findOne(query);
+      res.send(result);
+    });
+
     app.get("/my-queries", async (req, res) => {
-      const result = await queriesCollection.find().toArray();
+      const email = req.query.email;
+      const query = { user_email: email };
+      const result = await queriesCollection.find(query).toArray();
       res.send(result);
     });
 
