@@ -44,9 +44,15 @@ async function run() {
 
     app.get("/product-details/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
       const query = { _id: new ObjectId(id) };
       const result = await queriesCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.get("/recommended-queries/:id", async (req, res) => {
+      const params = req.params.id;
+      const query = { queryId: params };
+      const result = await recommendationCollection.find(query).toArray();
       res.send(result);
     });
 
