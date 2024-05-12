@@ -75,10 +75,22 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/recent-queries", async (req, res) => {
+      const result = await queriesCollection.find().toArray();
+      res.send(result);
+    });
+
     app.get("/my-queries", async (req, res) => {
       const email = req.query.email;
       const query = { user_email: email };
       const result = await queriesCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get("/my-recommendation", async (req, res) => {
+      const email = req.query.email;
+      const query = { recommender_email: email };
+      const result = await recommendationCollection.find(query).toArray();
       res.send(result);
     });
 
