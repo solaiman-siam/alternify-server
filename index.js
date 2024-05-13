@@ -80,6 +80,29 @@ async function run() {
       res.send(result);
     });
 
+    // delete recommendation
+    app.delete("/delete-recommendation/:id", async (req, res) => {
+      const countId = req.body.var1;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(countId) };
+      const query = { _id: new ObjectId(id) };
+      console.log(countId, id);
+
+      const updateDoc = {
+        $inc: {
+          recommendation_count: -1,
+        },
+      };
+      const updateRecommendationCount = await queriesCollection.updateOne(
+        filter,
+        updateDoc
+      );
+
+      const result = await recommendationCollection.deleteOne(query);
+
+      res.send(result);
+    });
+
     app.get("/my-queries", async (req, res) => {
       const email = req.query.email;
       const query = { user_email: email };
