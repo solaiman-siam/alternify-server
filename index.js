@@ -37,9 +37,31 @@ async function run() {
       const result = await queriesCollection.insertOne(queries);
       res.send(result);
     });
+
     app.get("/all-queries", async (req, res) => {
       const result = await queriesCollection.find().toArray();
       res.send(result);
+    });
+
+    app.get("/queries", async (req, res) => {
+      const page = parseInt(req.query.page) - 1;
+      const size = parseInt(req.query.size);
+      console.log("page query", req.query);
+      const search = req.query.search;
+      const query = {
+        product_name: { $regex: search, $options: "i" },
+      };
+      const result = await queriesCollection
+        .find()
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/queries-count", async (req, res) => {
+      const count = await queriesCollection.countDocuments();
+      res.send({ count });
     });
 
     app.get("/product-details/:id", async (req, res) => {
@@ -123,6 +145,13 @@ async function run() {
       const result = await recommendationCollection.find(query).toArray();
       res.send(result);
     });
+
+    // app.get("/search-queries", async (req, res) => {
+    //   const search = req.query.search;
+    //   const query = { product_name: { $regex: search, $options: "i" } };
+    //   const result = await queriesCollection.find(query).toArray();
+    //   res.send(result);
+    // });
 
     app.delete("/delete-queries/:id", async (req, res) => {
       const params = req.params.id;
