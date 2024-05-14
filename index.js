@@ -1,13 +1,38 @@
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://alternify-15eba.web.app/"],
+    credentials: true,
+  })
+);
+app.use(cookieParser());
+
+// token verify
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token;
+
+  if (!token) return res.status(403).send({ message: "Un-Authorized Access" });
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(403).send({ message: "Un-Authorized Access" });
+      }
+      console.log(decoded);
+      req.user = decoded;
+      next();
+    });
+  }
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8vxmi4o.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -19,6 +44,12 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
 
 async function run() {
   try {
@@ -32,12 +63,32 @@ async function run() {
       .db("alternifyDB")
       .collection("recommendations");
 
-    app.post("/add-queries", async (req, res) => {
+    // creating jwt token
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      console.log("user for token", user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "365d",
+      });
+
+      res.cookie("token", token, cookieOptions).send({ success: true });
+    });
+    // logout and clear cookie
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logging out", user);
+      res
+        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
+        .send({ success: true });
+    });
+    // add query
+    app.post("/add-queries", verifyToken, async (req, res) => {
       const queries = req.body;
       const result = await queriesCollection.insertOne(queries);
       res.send(result);
     });
-
+    // all queries
     app.get("/all-queries", async (req, res) => {
       const result = await queriesCollection.find().toArray();
       res.send(result);
@@ -52,7 +103,7 @@ async function run() {
         product_name: { $regex: search, $options: "i" },
       };
       const result = await queriesCollection
-        .find()
+        .find(query)
         .skip(page * size)
         .limit(size)
         .toArray();
@@ -60,11 +111,15 @@ async function run() {
     });
 
     app.get("/queries-count", async (req, res) => {
-      const count = await queriesCollection.countDocuments();
+      const search = req.query.search;
+      const query = {
+        product_name: { $regex: search, $options: "i" },
+      };
+      const count = await queriesCollection.countDocuments(query);
       res.send({ count });
     });
-
-    app.get("/product-details/:id", async (req, res) => {
+    // product details
+    app.get("/product-details/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await queriesCollection.findOne(query);
@@ -78,7 +133,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/add-recommendation", async (req, res) => {
+    app.post("/add-recommendation", verifyToken, async (req, res) => {
       const recommendedData = req.body;
       const id = recommendedData.queryId;
       const filter = { _id: new ObjectId(id) };
@@ -97,7 +152,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/recent-queries", async (req, res) => {
+    app.get("/recent-queries", verifyToken, async (req, res) => {
       const result = await queriesCollection.find().toArray();
       res.send(result);
     });
@@ -125,33 +180,28 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/my-queries", async (req, res) => {
+    app.get("/my-queries", verifyToken, async (req, res) => {
+      const tokenData = req.user.email;
+      console.log(tokenData);
       const email = req.query.email;
       const query = { user_email: email };
       const result = await queriesCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.get("/recommendation-for-me", async (req, res) => {
+    app.get("/recommendation-for-me", verifyToken, async (req, res) => {
       const email = req.query.email;
       const query = { user_email: email };
       const result = await recommendationCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.get("/my-recommendation", async (req, res) => {
+    app.get("/my-recommendation", verifyToken, async (req, res) => {
       const email = req.query.email;
       const query = { recommender_email: email };
       const result = await recommendationCollection.find(query).toArray();
       res.send(result);
     });
-
-    // app.get("/search-queries", async (req, res) => {
-    //   const search = req.query.search;
-    //   const query = { product_name: { $regex: search, $options: "i" } };
-    //   const result = await queriesCollection.find(query).toArray();
-    //   res.send(result);
-    // });
 
     app.delete("/delete-queries/:id", async (req, res) => {
       const params = req.params.id;
