@@ -1,9 +1,10 @@
+require("dotenv").config();
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cookieParser = require("cookie-parser");
-require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -43,10 +44,8 @@ const verifyToken = (req, res, next) => {
   if (token) {
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
       if (err) {
-        console.log(err);
         return res.status(401).send({ message: "unauthorized access" });
       }
-      console.log(decoded);
 
       req.user = decoded;
       next();
@@ -68,9 +67,30 @@ async function run() {
     // await client.db("admin").command({ ping: 1 });
 
     const queriesCollection = client.db("alternifyDB").collection("queries");
+    const donationCollection = client.db("alternifyDB").collection("donations");
     const recommendationCollection = client
       .db("alternifyDB")
       .collection("recommendations");
+
+    // donate related api
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({ clientSecret: paymentIntent.client_secret });
+    });
+
+    app.post("/donations", async (req, res) => {
+      const donationInfo = req.body;
+      const result = await donationCollection.insertOne(donationInfo);
+      res.send(result);
+    });
 
     // creating jwt token
     app.post("/jwt", async (req, res) => {
@@ -90,7 +110,6 @@ async function run() {
     // logout and clear cookie
     app.post("/logout", async (req, res) => {
       const user = req.body;
-      console.log("logging out", user);
       res
         .clearCookie("token", { ...cookieOptions, maxAge: 0 })
         .send({ success: true });
@@ -176,7 +195,6 @@ async function run() {
       const id = req.params.id;
       const filter = { _id: new ObjectId(countId) };
       const query = { _id: new ObjectId(id) };
-      console.log(countId, id);
 
       const updateDoc = {
         $inc: {
